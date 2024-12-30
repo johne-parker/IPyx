@@ -28,7 +28,7 @@ if response.status_code == 200:
         try:
             with open("ip.txt", "w", encoding="utf-8") as f:
                 for ip in ips:
-                    f.write(ip + "\n")
+                    f.write(f"{ip}:443#WZYX\n")
             print("IP 地址成功写入到 ip.txt 文件！")
         except Exception as e:
             print(f"写入 ip.txt 文件时出现错误：{e}")
