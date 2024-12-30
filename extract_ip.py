@@ -19,9 +19,13 @@ if response.status_code == 200:
         print("提取到的 IP 地址：", ips)
 
         # 写入到 ip.txt 文件
-        with open("ip.txt", "w") as f:
-            for ip in ips:
-                f.write(ip + "\n")
+        try:
+            with open("ip.txt", "w", encoding="utf-8") as f:
+                for ip in ips:
+                    f.write(ip + "\n")
+            print("IP 地址成功写入到 ip.txt 文件！")
+        except Exception as e:
+            print(f"写入 ip.txt 文件时出现错误：{e}")
     else:
         print("未找到表格")
 else:
