@@ -24,8 +24,11 @@ jobs:
       - name: Run Python script
         run: python extract_ip.py
 
-      - name: Upload ip.txt
+      - name: Upload ip.txt to GitHub Artifacts
         uses: actions/upload-artifact@v3
         with:
           name: ip-list
           path: ip.txt
+
+      - name: Show content of ip.txt
+        run: cat ip.txt
