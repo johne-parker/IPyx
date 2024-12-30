@@ -1,7 +1,10 @@
 name: Extract IP Addresses
 
 on:
-  workflow_dispatch: # 手动触发工作流
+  schedule:
+    # 每三个小时运行一次
+    - cron: "0 */3 * * *"
+  workflow_dispatch: # 允许手动触发
 
 jobs:
   extract-ips:
