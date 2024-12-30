@@ -24,11 +24,10 @@ jobs:
       - name: Run Python script
         run: python extract_ip.py
 
-      - name: Upload ip.txt to GitHub Artifacts
-        uses: actions/upload-artifact@v3
-        with:
-          name: ip-list
-          path: ip.txt
-
-      - name: Show content of ip.txt
-        run: cat ip.txt
+      - name: Commit and push ip.txt to repository
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add ip.txt
+          git commit -m "Add updated ip.txt"
+          git push
