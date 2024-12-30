@@ -8,35 +8,26 @@ def fetch_ips(url):
     try:
         # 获取网页内容
         response = requests.get(url)
-        response.raise_for_status()
-        
-        # 解析 HTML
-        soup = BeautifulSoup(response.text, "html.parser")
-        
-        # 找到表格中第一列的 IP 地址
-        ip_list = []
-        table = soup.find("table")  # 假设网页只有一个表格
-        if table:
-            rows = table.find_all("tr")[1:]  # 跳过表头
-            for row in rows:
-                ip_column = row.find_all("td")[0]  # 第一列
-                if ip_column:
-                    ip = ip_column.text.strip().replace("★", "")  # 去除特殊字符
-                    ip_list.append(ip)
-        return ip_list
-    except Exception as e:
-        print(f"Error occurred: {e}")
-        return []
+        if response.status_code == 200:
+    soup = BeautifulSoup(response.text, "html.parser")
 
-# 提取 IP 并写入文件
-def write_ips_to_file(ip_list, filename="ip.txt"):
-    try:
-        with open(filename, "w") as f:
-            for ip in ip_list:
+    # 提取表格中的第一列 IP 地址
+    table = soup.find("table")  # 找到第一个表格
+    if table:
+        rows = table.find_all("tr")[1:]  # 跳过表头
+        ips = [row.find("td").get_text(strip=True) for row in rows if row.find("td")]
+
+        # 打印提取的 IP 地址
+        print("提取到的 IP 地址：", ips)
+
+        # 写入到 ip.txt 文件
+        with open("ip.txt", "w") as f:
+            for ip in ips:
                 f.write(ip + "\n")
-        print(f"Successfully wrote {len(ip_list)} IPs to {filename}")
-    except Exception as e:
-        print(f"Error writing to file: {e}")
+    else:
+        print("未找到表格")
+else:
+    print(f"无法访问网页，状态码: {response.status_code}")
 
 if __name__ == "__main__":
     ips = fetch_ips(url)
