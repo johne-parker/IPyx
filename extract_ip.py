@@ -13,7 +13,13 @@ if response.status_code == 200:
     table = soup.find("table")  # 找到第一个表格
     if table:
         rows = table.find_all("tr")[1:]  # 跳过表头
-        ips = [row.find("td").get_text(strip=True) for row in rows if row.find("td")]
+        ips = []
+        for row in rows:
+            cell = row.find("td")
+            if cell:
+                ip = cell.get_text(strip=True)
+                ip = ip.replace("★", "").strip()  # 去除特殊符号和多余空格
+                ips.append(ip)
 
         # 打印提取的 IP 地址（供调试用）
         print("提取到的 IP 地址：", ips)
