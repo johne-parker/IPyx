@@ -1,5 +1,25 @@
 import requests
 from bs4 import BeautifulSoup
+import os
+import subprocess
+
+def check_git_changes():
+    """检查 Git 是否有更改"""
+    try:
+        result = subprocess.run(['git', 'status', '--porcelain'], capture_output=True, text=True, check=True)
+        return bool(result.stdout.strip())  # 如果有输出，则表示有更改
+    except subprocess.CalledProcessError as e:
+        print(f"检查 Git 状态时出错：{e}")
+        return False
+
+def commit_changes():
+    """提交更改"""
+    try:
+        subprocess.run(['git', 'add', 'ip.txt'], check=True)
+        subprocess.run(['git', 'commit', '-m', '更新 ip.txt'], check=True)
+        print("IP 地址已成功提交！")
+    except subprocess.CalledProcessError as e:
+        print(f"提交更改时出错：{e}")
 
 # 获取网页内容
 url = "https://ip.164746.xyz/"
@@ -30,6 +50,12 @@ if response.status_code == 200:
                 for ip in ips:
                     f.write(f"{ip}:443#WZYX\n")
             print("IP 地址成功写入到 ip.txt 文件！")
+
+            if check_git_changes():  # 检查是否有更改
+                commit_changes()  # 提交更改
+            else:
+                print("ip.txt 文件没有变化，无需提交。")
+
         except Exception as e:
             print(f"写入 ip.txt 文件时出现错误：{e}")
     else:
