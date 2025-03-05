@@ -17,6 +17,8 @@ def check_git_changes():
 def commit_changes():
     """提交更改"""
     try:
+        subprocess.run(['git', 'config', '--global', 'user.name', 'github-actions[bot]'], check=True)
+        subprocess.run(['git', 'config', '--global', 'user.email', 'github-actions[bot]@users.noreply.github.com'], check=True)
         subprocess.run(['git', 'add', 'ip.txt'], check=True)
         print("git add 命令执行成功")
         subprocess.run(['git', 'commit', '-m', '更新 ip.txt'], check=True)
