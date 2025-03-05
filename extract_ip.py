@@ -7,6 +7,8 @@ def check_git_changes():
     """检查 Git 是否有更改"""
     try:
         result = subprocess.run(['git', 'status', '--porcelain'], capture_output=True, text=True, check=True)
+        # 添加调试输出：打印 git status --porcelain 输出
+        print("git status --porcelain 输出：", result.stdout)
         return bool(result.stdout.strip())  # 如果有输出，则表示有更改
     except subprocess.CalledProcessError as e:
         print(f"检查 Git 状态时出错：{e}")
@@ -16,7 +18,9 @@ def commit_changes():
     """提交更改"""
     try:
         subprocess.run(['git', 'add', 'ip.txt'], check=True)
+        print("git add 命令执行成功")
         subprocess.run(['git', 'commit', '-m', '更新 ip.txt'], check=True)
+        print("git commit 命令执行成功")
         print("IP 地址已成功提交！")
     except subprocess.CalledProcessError as e:
         print(f"提交更改时出错：{e}")
@@ -44,12 +48,16 @@ if response.status_code == 200:
         # 打印提取的 IP 地址（供调试用）
         print("提取到的 IP 地址：", ips)
 
-        # 写入到 ip.txt 文件
+       # 写入到 ip.txt 文件
         try:
             with open("ip.txt", "w", encoding="utf-8") as f:
                 for ip in ips:
                     f.write(f"{ip}:443#WZYX\n")
             print("IP 地址成功写入到 ip.txt 文件！")
+
+            # 添加调试输出：打印 ip.txt 文件内容
+            with open("ip.txt", "r", encoding="utf-8") as f:
+                print("ip.txt 文件内容：", f.read())
 
             if check_git_changes():  # 检查是否有更改
                 commit_changes()  # 提交更改
