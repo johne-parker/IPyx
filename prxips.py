@@ -1,4 +1,5 @@
 import requests
+import os
 
 def get_proxy_ips(raw_url, output_file):
     """
@@ -30,6 +31,9 @@ def get_proxy_ips(raw_url, output_file):
         print(f"处理数据时出错: {e}")
 
 if __name__ == "__main__":
-    raw_url = "https://raw.githubusercontent.com/FoolVPN-ID/Nautica/refs/heads/main/proxyList.txt"  # 替换为您的 raw URL
+    raw_url = os.environ.get("RAW_URL") # 从环境变量获取 raw_url
     output_file = "prxyip.txt"
-    get_proxy_ips(raw_url, output_file)
+    if raw_url:
+        get_proxy_ips(raw_url, output_file)
+    else:
+        print("错误：未设置 RAW_URL 环境变量。")
