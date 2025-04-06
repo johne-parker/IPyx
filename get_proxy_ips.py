@@ -1,32 +1,35 @@
 import requests
-import json
 
-def get_proxy_ips(url):
-    """从远程 URL 读取数据，提取符合条件的数据，并转换为 JSON 格式。"""
+def get_proxy_ips(raw_url, output_file):
+    """
+    从 raw URL 获取代理 IP，并按照指定格式写入文件。
+
+    Args:
+        raw_url (str): 包含代理 IP 信息的 raw URL。
+        output_file (str): 输出文件名。
+    """
     try:
-        response = requests.get(url)
-        response.raise_for_status()  # 检查 HTTP 错误
-        data = response.text.splitlines()
+        response = requests.get(raw_url)
+        response.raise_for_status()  # 检查请求是否成功
 
-        pl_ips = []
-        for line in data:
+        proxy_ips = []
+        for line in response.text.splitlines():
             parts = line.split(",")
-            if len(parts) >= 4 and "PL" in parts[3]:
-                pl_ips.append(f"{parts[0]}:{parts[1]}")
+            if len(parts) >= 4 and parts[2] == "PL":
+                proxy_ips.append(f"{parts[0]}:{parts[1]}")
 
-        return json.dumps(pl_ips)
+        with open(output_file, "w") as f:
+            for ip in proxy_ips:
+                f.write(ip + "\n")
+
+        print(f"成功获取 {len(proxy_ips)} 个代理 IP，并写入 {output_file}")
 
     except requests.exceptions.RequestException as e:
-        print(f"Error fetching data: {e}")
-        return None
+        print(f"获取 raw URL 时出错: {e}")
+    except Exception as e:
+        print(f"处理数据时出错: {e}")
 
 if __name__ == "__main__":
-    url = "https://raw.githubusercontent.com/FoolVPN-ID/Nautica/refs/heads/main/proxyList.txt"  # 替换为您的远程 URL
-    json_data = get_proxy_ips(url)
-
-    if json_data:
-        with open("proxyip.json", "w") as f:
-            f.write(json_data)
-        print("proxyip.json generated successfully.")
-    else:
-        print("Failed to generate proxyip.json.")
+    raw_url = "https://raw.githubusercontent.com/FoolVPN-ID/Nautica/refs/heads/main/proxyList.txt"  # 替换为您的 raw URL
+    output_file = "proxyip.txt"
+    get_proxy_ips(raw_url, output_file)
