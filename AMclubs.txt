@@ -1,5 +1,6 @@
 https://raw.githubusercontent.com/johne-parker/IPyx/refs/heads/main/ip.txt
-https://raw.githubusercontent.com/amclubs/am-cf-tunnel/main/ipJP.txt@ProxyIP.JP.CMLiussss.net
-https://raw.githubusercontent.com/amclubs/am-cf-tunnel/main/ipHK.txt@ProxyIP.HK.CMLiussss.net
-https://raw.githubusercontent.com/amclubs/am-cf-tunnel/main/ipv4.csv
+https://ipdb.api.030101.xyz/?type=bestcf&country=true@ProxyIP.US.CMLiussss.net
+https://addressesapi.090227.xyz/CloudFlareYes@ProxyIP.US.CMLiussss.net
+https://addressesapi.090227.xyz/ip.164746.xyz@ProxyIP.US.CMLiussss.net
 https://raw.githubusercontent.com/amclubs/am-cf-tunnel/main/ipUS.txt@ProxyIP.US.CMLiussss.net
+https://raw.githubusercontent.com/amclubs/am-cf-tunnel/main/ipJP.txt@ProxyIP.JP.CMLiussss.net
