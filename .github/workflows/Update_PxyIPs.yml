@@ -22,6 +22,8 @@ jobs:
         run: pip install requests
 
       - name: Run script
+        env:
+          RAW_URL: ${{ secrets.RAW_URL }} # 从 secrets 中获取 raw_url
         run: python prxips.py
 
       - name: Commit and push changes
@@ -30,4 +32,4 @@ jobs:
           git config --global user.name "GitHub Actions"
           git add prxyip.txt
           git commit -m "Update prxyip.txt with Python script"
-          git push origin HEAD:main --token ${{ secrets.GITHUB_TOKEN }} # 添加token
+          git push origin main --token ${{ secrets.GITHUB_TOKEN }} # 添加token，更改分支为main
