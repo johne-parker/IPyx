@@ -31,5 +31,5 @@ def get_proxy_ips(raw_url, output_file):
 
 if __name__ == "__main__":
     raw_url = "https://raw.githubusercontent.com/FoolVPN-ID/Nautica/refs/heads/main/proxyList.txt"  # 替换为您的 raw URL
-    output_file = "proxyip.txt"
+    output_file = "prxyip.txt"
     get_proxy_ips(raw_url, output_file)
