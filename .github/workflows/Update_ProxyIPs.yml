@@ -1,6 +1,7 @@
 name: Update Proxy PL_IPs
 
 on:
+  workflow_dispatch: # 允许手动触发工作流
   schedule:
     - cron: '0 0 * * *'  # 每天 00:00 运行
 
