@@ -22,7 +22,7 @@ jobs:
         run: pip install requests
 
       - name: Run script
-        run: python get_proxy_ips.py
+        run: python prxips.py
 
       - name: Commit and push changes
         run: |
