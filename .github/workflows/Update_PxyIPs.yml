@@ -32,4 +32,4 @@ jobs:
           git config --global user.name "GitHub Actions"
           git add prxyip.txt
           git commit -m "Update prxyip.txt with Python script"
-          git push origin main --token ${{ secrets.GITHUB_TOKEN }} # 添加token，更改分支为main
+          git push "https://${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" main
