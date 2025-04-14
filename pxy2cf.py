@@ -1,33 +1,30 @@
 import requests
 import os
 import random
-import json
+import json # <<< Import json library
 from collections import defaultdict
 import time
-import re # Import re for IP validation
+import re
 
-# --- 配置 ---
+# --- 配置 (部分移至环境变量) ---
 # Cloudflare API 的基础 URL
 CF_API_BASE_URL = "https://api.cloudflare.com/client/v4"
-# 国家代码到域名的映射
-DOMAIN_MAP = {
-    "PL": "pl.anambangunan.eu.org",
-    "AE": "ae.anambangunan.eu.org",
-    "CA": "ca.anambangunan.eu.org",
-}
-# 要处理的国家代码列表
+# 国家代码到域名的映射 - <<< REMOVED FROM HERE, will be loaded from env var >>>
+# TARGET_COUNTRIES is still useful if DOMAIN_MAP_JSON contains more than needed
 TARGET_COUNTRIES = ["PL", "AE", "CA"]
 # 每个国家随机选择的端口为443的IP数量上限
-NUM_IPS_PER_COUNTRY = 5 # <<< Goal: Up to 5 records per domain
+NUM_IPS_PER_COUNTRY = 5
 # IPv4 Regex for validation
 IPV4_REGEX = r"^((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])$"
-# Cloudflare Proxied status (Orange/Grey cloud)
-PROXY_STATUS = False # Default to False (Grey cloud)
-# DNS Record TTL (Time To Live) in seconds. 1 = Automatic
-RECORD_TTL = 60 # e.g., 60 seconds
+# Cloudflare Proxied status
+PROXY_STATUS = False
+# DNS Record TTL
+RECORD_TTL = 60
 
 # --- Cloudflare API 函数 ---
-
+# (verify_cf_credentials, cf_api_request, get_cf_dns_records,
+#  delete_cf_dns_record, clear_cf_domain_a_records, create_cf_dns_record 函数保持不变)
+# --- （为简洁起见，省略了这些函数的代码，它们和上一个版本完全相同） ---
 def cf_api_request(method, endpoint, zone_id, api_token, params=None, data=None):
     """统一处理 Cloudflare API 请求"""
     headers = {
@@ -35,16 +32,12 @@ def cf_api_request(method, endpoint, zone_id, api_token, params=None, data=None)
         "Content-Type": "application/json",
     }
     base_url = CF_API_BASE_URL.rstrip('/')
-    # Zone ID might be None for verification endpoints if we used /user/tokens/verify
     zone_segment = f"/zones/{zone_id}" if zone_id else "" 
-    endpoint_segment = f"/{endpoint.lstrip('/')}" if endpoint else "" # Handle empty endpoint for zone root
-    
+    endpoint_segment = f"/{endpoint.lstrip('/')}" if endpoint else "" 
     url = f"{base_url}{zone_segment}{endpoint_segment}"
-
     try:
         response = requests.request(method, url, headers=headers, params=params, json=data, timeout=20)
         response.raise_for_status() 
-
         try:
              response_data = response.json()
              if not response_data.get("success"):
@@ -53,18 +46,17 @@ def cf_api_request(method, endpoint, zone_id, api_token, params=None, data=None)
                  return None
              return response_data
         except json.JSONDecodeError:
-            if response.status_code == 200 and method.upper() in ['DELETE', 'PUT', 'GET']: # GET /zones/{id} success has JSON
-                print(f"信息: {method} 请求成功，状态码 {response.status_code}，无JSON响应体或非标准成功响应。")
-                # For GET /zones/{id}, success requires JSON, so treat non-JSON as error here
-                if method.upper() == 'GET' and endpoint == "": # Specific check for zone verification endpoint
+            if response.status_code == 200 and method.upper() in ['DELETE', 'PUT', 'GET']:
+                if method.upper() == 'GET' and endpoint == "":
                      print(f"错误: 获取 Zone 信息时响应非 JSON。")
                      return None
+                # For successful DELETE/PUT without JSON body
+                print(f"信息: {method} 请求成功，状态码 {response.status_code}，无JSON响应体或非标准成功响应。")
                 return {"success": True} 
             else:
                 print(f"警告：无法解析 Cloudflare API 响应为 JSON ({method} {url}). 状态码: {response.status_code}")
                 print(f"响应体 (前500字符): {response.text[:500]}")
                 return None
-
     except requests.exceptions.Timeout:
         print(f"错误：Cloudflare API 请求超时 ({method} {url})")
         return None
@@ -78,16 +70,12 @@ def cf_api_request(method, endpoint, zone_id, api_token, params=None, data=None)
                  print("无法读取响应体。")
         return None
 
-# <<< Function: Verify Credentials (Integrated) >>>
 def verify_cf_credentials(zone_id, api_token):
     """验证 Cloudflare API Token 和 Zone ID 是否有效"""
     print("开始验证 Cloudflare 凭据...")
-    # Use GET /zones/{zone_id} endpoint for verification
-    endpoint = "" # API helper builds the full /zones/{zone_id} URL
+    endpoint = "" 
     response_data = cf_api_request("GET", endpoint, zone_id, api_token)
-
     if response_data and response_data.get("success"):
-        # Check if result is actually present, as success:true might be returned even on errors sometimes
         zone_info = response_data.get("result") 
         if zone_info and zone_info.get("id") == zone_id:
              zone_name = zone_info.get("name", "N/A")
@@ -99,14 +87,12 @@ def verify_cf_credentials(zone_id, api_token):
              return False
     else:
         print("错误：Cloudflare 凭据验证失败。请检查 CF_ZONE_ID 和 CF_API_TOKEN。")
-        # The cf_api_request function already prints detailed errors
         return False
 
 def get_cf_dns_records(zone_id, api_token, domain_name):
     """获取指定域名的所有 Cloudflare DNS 'A' 记录"""
     print(f"  - 正在查询域名 '{domain_name}' 的现有 'A' 记录 (用于清理)...")
     endpoint = "dns_records"
-    # Fetch more per page as we need all to delete them
     params = {"type": "A", "name": domain_name, "per_page": 100} 
     response_data = cf_api_request("GET", endpoint, zone_id, api_token, params=params)
     if response_data and response_data.get("success"):
@@ -122,7 +108,6 @@ def delete_cf_dns_record(zone_id, api_token, record_id):
     endpoint = f"dns_records/{record_id}"
     print(f"    - 尝试删除记录 ID: {record_id}...")
     response_data = cf_api_request("DELETE", endpoint, zone_id, api_token)
-    # Check success based on the helper function's return logic
     if response_data and response_data.get("success"):
         print(f"    - 成功删除记录 ID: {record_id}")
         return True
@@ -137,7 +122,6 @@ def clear_cf_domain_a_records(zone_id, api_token, domain_name):
     if not existing_records:
         print(f"  - 域名 '{domain_name}' 没有找到现有的 'A' 记录，无需清除。")
         return True
-
     deletion_results = []
     print(f"  - 准备删除 {len(existing_records)} 条记录...")
     for record in existing_records:
@@ -145,11 +129,10 @@ def clear_cf_domain_a_records(zone_id, api_token, domain_name):
         if record_id:
             result = delete_cf_dns_record(zone_id, api_token, record_id)
             deletion_results.append(result)
-            time.sleep(0.2) # Small delay between deletions
+            time.sleep(0.2) 
         else:
             print(f"警告：找到一条记录但缺少 ID: {record}")
             deletion_results.append(False)
-
     if all(deletion_results):
         print(f"  - 成功清除了 {len(deletion_results)} 条域名 '{domain_name}' 的 'A' 记录。")
         return True
@@ -176,16 +159,16 @@ def create_cf_dns_record(zone_id, api_token, domain_name, ip_address):
     else:
         print(f"    - 创建记录失败: {domain_name} -> {ip_address}")
         return False
-
+        
 # --- 主要逻辑 ---
-
-def process_ips_and_update_dns(raw_url, cf_zone_id, cf_api_token):
+# <<< Modified function signature to accept domain_map >>>
+def process_ips_and_update_dns(raw_url, cf_zone_id, cf_api_token, domain_map):
     """
     获取、筛选 IP，验证凭据，清理旧记录，并为每个选定 IP 创建新的 Cloudflare DNS 记录。
+    使用从环境变量加载的 domain_map。
     """
-    # <<< Step 1: Verify Credentials (Integrated) >>>
     if not verify_cf_credentials(cf_zone_id, cf_api_token):
-        return # Stop execution if verification fails
+        return 
 
     print(f"\n开始从 {raw_url} 获取 IP 数据...")
     ips_by_country = defaultdict(list)
@@ -198,8 +181,7 @@ def process_ips_and_update_dns(raw_url, cf_zone_id, cf_api_token):
         lines = response.text.splitlines()
         processed_lines = 0
         found_ips_count = 0
-
-        ip_pattern = re.compile(IPV4_REGEX) # Compile regex
+        ip_pattern = re.compile(IPV4_REGEX)
 
         for line in lines:
             parts = line.strip().split(",")
@@ -207,10 +189,10 @@ def process_ips_and_update_dns(raw_url, cf_zone_id, cf_api_token):
                 ip = parts[0]
                 port = parts[1]
                 country_code = parts[2]
-
-                # Filter: Port 443, Target Country, Valid IPv4
-                if port == "443" and country_code in TARGET_COUNTRIES:
-                    if ip_pattern.match(ip): # Use regex validation
+                
+                # Filter based on TARGET_COUNTRIES and check if country is in domain_map
+                if port == "443" and country_code in TARGET_COUNTRIES and country_code in domain_map:
+                    if ip_pattern.match(ip):
                          ips_by_country[country_code].append(ip)
                          found_ips_count += 1
                     else:
@@ -223,50 +205,40 @@ def process_ips_and_update_dns(raw_url, cf_zone_id, cf_api_token):
             print("未找到任何符合条件的 IP 地址可用于更新。")
             return
 
-        # Process each country: Select IPs, Clear old records, Create new records
         for country_code, available_ips in ips_by_country.items():
             print(f"\n--- 处理国家: {country_code} (找到 {len(available_ips)} 个有效 IP) ---")
 
-            domain_name = DOMAIN_MAP.get(country_code)
-            if not domain_name:
-                print(f"错误：未在 DOMAIN_MAP 中找到国家代码 {country_code} 的域名映射。跳过此国家。")
+            # <<< Use domain_map argument here >>>
+            domain_name = domain_map.get(country_code) 
+            # Redundant check as we filtered earlier, but safe
+            if not domain_name: 
+                print(f"错误：未能从加载的 domain_map 中找到国家代码 {country_code} 的域名。跳过。")
                 continue
 
             if not available_ips:
                 print(f"国家 {country_code} 没有可用的有效 IP 地址，跳过 DNS 更新。")
-                # Optional: Clear old records even if no new IPs? Decide based on desired behavior.
-                # print(f"  - 尝试清理域名 '{domain_name}' 的旧记录...")
-                # clear_cf_domain_a_records(cf_zone_id, cf_api_token, domain_name)
                 continue
 
-            # <<< Step 2: Select up to NUM_IPS_PER_COUNTRY IPs >>>
             num_to_select = min(NUM_IPS_PER_COUNTRY, len(available_ips))
             selected_ips = random.sample(available_ips, num_to_select)
             print(f"为 '{domain_name}' 随机选择了 {len(selected_ips)} 个 IP: {selected_ips}")
 
-            # <<< Step 3: Clear existing 'A' records for this domain >>>
             if not clear_cf_domain_a_records(cf_zone_id, cf_api_token, domain_name):
                  print(f"警告: 清除域名 '{domain_name}' 的旧记录时遇到问题。将尝试创建新记录，但可能导致记录重复。")
-                 # Consider stopping here if clean slate is critical:
-                 # continue
 
-            # <<< Step 4: Create new 'A' record for each selected IP >>>
             print(f"  - 开始为域名 '{domain_name}' 创建 {len(selected_ips)} 条新的 'A' 记录...")
             creation_results = []
             if selected_ips:
                 for ip_addr in selected_ips:
                     result = create_cf_dns_record(cf_zone_id, cf_api_token, domain_name, ip_addr)
                     creation_results.append(result)
-                    time.sleep(0.2) # Small delay between creations
+                    time.sleep(0.2)
 
                 success_count = creation_results.count(True)
                 failure_count = len(creation_results) - success_count
                 print(f"  - 为域名 '{domain_name}' 创建记录完成: {success_count} 成功, {failure_count} 失败。")
             else:
                  print(f"  - 没有为 {country_code} 选择到 IP，不创建新记录。")
-
-            # Optional delay between processing different countries/domains if needed
-            # time.sleep(1)
 
     except requests.exceptions.Timeout:
         print(f"错误：获取 raw URL ({raw_url}) 超时。")
@@ -275,7 +247,7 @@ def process_ips_and_update_dns(raw_url, cf_zone_id, cf_api_token):
     except Exception as e:
         print(f"处理数据或更新 DNS 时发生意外错误: {e}")
         import traceback
-        traceback.print_exc() # Print detailed stack trace for debugging
+        traceback.print_exc()
 
 # --- 主程序入口 ---
 
@@ -284,27 +256,39 @@ if __name__ == "__main__":
     raw_url = os.environ.get("RAW_URL")
     cf_zone_id = os.environ.get("CF_ZONE_ID")
     cf_api_token = os.environ.get("CF_API_TOKEN")
+    # <<< Get DOMAIN_MAP from environment variable >>>
+    domain_map_json_str = os.environ.get("DOMAIN_MAP_JSON")
 
-    print("--- DNS 更新脚本 (清理并创建多条记录模式) 启动 ---")
-    # Use current time based on the system where the script runs
-    print(f"当前时间: {time.strftime('%Y-%m-%d %H:%M:%S %Z')}") 
+    print("--- DNS 更新脚本 (清理并创建多条记录模式 - DOMAIN_MAP from Secret) 启动 ---")
+    print(f"当前时间: {time.strftime('%Y-%m-%d %H:%M:%S %Z')}")
 
-
+    # Check required environment variables
     missing_vars = []
     if not raw_url: missing_vars.append("RAW_URL")
     if not cf_zone_id: missing_vars.append("CF_ZONE_ID")
     if not cf_api_token: missing_vars.append("CF_API_TOKEN")
+    if not domain_map_json_str: missing_vars.append("DOMAIN_MAP_JSON") # <<< Check new variable
 
     if missing_vars:
         print(f"错误：以下环境变量未设置: {', '.join(missing_vars)}")
     else:
-        print("所有必需的环境变量已找到。")
-        print(f"源 URL: {raw_url}")
-        print(f"Cloudflare Zone ID: {cf_zone_id}")
-        print(f"目标域名映射: {DOMAIN_MAP}")
-        print(f"每个域名将清理旧记录并创建最多 {NUM_IPS_PER_COUNTRY} 条新记录。")
-        
-        # Execute main logic
-        process_ips_and_update_dns(raw_url, cf_zone_id, cf_api_token)
+        # <<< Parse DOMAIN_MAP_JSON >>>
+        try:
+            loaded_domain_map = json.loads(domain_map_json_str)
+            if not isinstance(loaded_domain_map, dict):
+                 raise ValueError("DOMAIN_MAP_JSON 解析结果不是一个字典。")
+            print("成功从环境变量加载并解析 DOMAIN_MAP_JSON。")
+            print(f"加载的域名映射: {loaded_domain_map}") # Print loaded map for confirmation
+
+            # Execute main logic, passing the loaded map
+            process_ips_and_update_dns(raw_url, cf_zone_id, cf_api_token, loaded_domain_map)
+
+        except json.JSONDecodeError as e:
+            print(f"错误：无法将 DOMAIN_MAP_JSON 解析为有效的 JSON: {e}")
+            print(f"请检查 GitHub Secret 'DOMAIN_MAP_JSON' 的值是否为有效的 JSON 字符串，例如：")
+            print('{"PL": "pl.yourdomain.com", "AE": "ae.yourdomain.com", ...}')
+        except ValueError as e:
+             print(f"错误: {e}")
+
 
     print("--- DNS 更新脚本结束 ---")
