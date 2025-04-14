@@ -1,0 +1,40 @@
+# .github/workflows/update_cloudflare_dns.yml
+
+name: Update Cloudflare DNS Records Regularly # Workflow 的名称
+
+on:
+  schedule:
+    # 每 6 小时运行一次 (基于 UTC 时间)
+    # 例如：在 00:00, 06:00, 12:00, 18:00 UTC 运行
+    - cron: '0 */6 * * *'
+  workflow_dispatch: # 允许手动从 Actions 页面触发此 workflow
+
+jobs:
+  update-dns:
+    runs-on: ubuntu-latest # 使用最新的 Ubuntu runner
+    steps:
+      # 第一步：签出你的仓库代码
+      - name: Checkout repository code
+        uses: actions/checkout@v4 # 使用 checkout action v4 版本
+
+      # 第二步：设置 Python 环境
+      - name: Set up Python environment
+        uses: actions/setup-python@v5 # 使用 setup-python action v5 版本
+        with:
+          python-version: '3.11' # 你可以指定具体版本, 或使用 '3.x'
+
+      # 第三步：安装 Python 脚本所需的依赖库
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install requests # 安装 requests 库
+
+      # 第四步：运行你的 Python DNS 更新脚本
+      - name: Run DNS Update Script
+        env:
+          # 将 GitHub Secrets 传递给脚本作为环境变量
+          RAW_URL: ${{ secrets.RAW_URL }}
+          CF_ZONE_ID: ${{ secrets.CF_ZONE_ID }}
+          CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+        # 运行你的 Python 脚本，确保文件名正确
+        run: python pxy2cf.py
