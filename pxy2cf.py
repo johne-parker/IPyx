@@ -11,9 +11,9 @@ import re # Import re for IP validation
 CF_API_BASE_URL = "https://api.cloudflare.com/client/v4"
 # 国家代码到域名的映射
 DOMAIN_MAP = {
-    "PL": "pl.nan.eu.org",
-    "AE": "ae.nan.eu.org",
-    "CA": "ca.nan.eu.org",
+    "PL": "pl.anambangunan.eu.org",
+    "AE": "ae.anambangunan.eu.org",
+    "CA": "ca.anambangunan.eu.org",
 }
 # 要处理的国家代码列表
 TARGET_COUNTRIES = ["PL", "AE", "CA"]
