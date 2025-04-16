@@ -1,7 +1,7 @@
-https://raw.githubusercontent.com/johne-parker/IPyx/refs/heads/main/ip.txt
+https://raw.githubusercontent.com/johne-parker/IPyx/refs/heads/main/ip.txt@ProxyIP.US.CMLiussss.net
 https://ipdb.api.030101.xyz/?type=bestcf&country=true@sjc.o00o.ooo
 https://addressesapi.090227.xyz/CloudFlareYes@sjc.o00o.ooo
 https://addressesapi.090227.xyz/ip.164746.xyz@sjc.o00o.ooo
-https://raw.githubusercontent.com/ymyuuu/IPDB/refs/heads/main/BestCF/bestcfv4.txt
+https://raw.githubusercontent.com/ymyuuu/IPDB/refs/heads/main/BestCF/bestcfv4.txt@ProxyIP.US.CMLiussss.net
 https://raw.githubusercontent.com/amclubs/am-cf-tunnel/main/ipUS.txt@ProxyIP.US.CMLiussss.net
 https://raw.githubusercontent.com/amclubs/am-cf-tunnel/main/ipJP.txt@ProxyIP.JP.CMLiussss.net
