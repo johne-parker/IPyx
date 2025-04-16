@@ -1,7 +1,7 @@
 import requests
 import os
 import random
-import json # <<< Import json library
+import json
 from collections import defaultdict
 import time
 import re
@@ -9,9 +9,9 @@ import re
 # --- 配置 (部分移至环境变量) ---
 # Cloudflare API 的基础 URL
 CF_API_BASE_URL = "https://api.cloudflare.com/client/v4"
-# 国家代码到域名的映射 - <<< REMOVED FROM HERE, will be loaded from env var >>>
-# TARGET_COUNTRIES is still useful if DOMAIN_MAP_JSON contains more than needed
-TARGET_COUNTRIES = ["PL", "AE", "CA"]
+# TARGET_COUNTRIES 控制脚本从源URL中提取哪些国家的IP
+# <<< Modified: Added "TW" >>>
+TARGET_COUNTRIES = ["PL", "AE", "CA", "TW"]
 # 每个国家随机选择的端口为443的IP数量上限
 NUM_IPS_PER_COUNTRY = 5
 # IPv4 Regex for validation
@@ -24,7 +24,7 @@ RECORD_TTL = 60
 # --- Cloudflare API 函数 ---
 # (verify_cf_credentials, cf_api_request, get_cf_dns_records,
 #  delete_cf_dns_record, clear_cf_domain_a_records, create_cf_dns_record 函数保持不变)
-# --- （为简洁起见，省略了这些函数的代码，它们和上一个版本完全相同） ---
+# --- （为简洁起见，再次省略这些与上一版本相同的函数代码） ---
 def cf_api_request(method, endpoint, zone_id, api_token, params=None, data=None):
     """统一处理 Cloudflare API 请求"""
     headers = {
@@ -50,7 +50,6 @@ def cf_api_request(method, endpoint, zone_id, api_token, params=None, data=None)
                 if method.upper() == 'GET' and endpoint == "":
                      print(f"错误: 获取 Zone 信息时响应非 JSON。")
                      return None
-                # For successful DELETE/PUT without JSON body
                 print(f"信息: {method} 请求成功，状态码 {response.status_code}，无JSON响应体或非标准成功响应。")
                 return {"success": True} 
             else:
@@ -161,7 +160,6 @@ def create_cf_dns_record(zone_id, api_token, domain_name, ip_address):
         return False
         
 # --- 主要逻辑 ---
-# <<< Modified function signature to accept domain_map >>>
 def process_ips_and_update_dns(raw_url, cf_zone_id, cf_api_token, domain_map):
     """
     获取、筛选 IP，验证凭据，清理旧记录，并为每个选定 IP 创建新的 Cloudflare DNS 记录。
@@ -191,6 +189,7 @@ def process_ips_and_update_dns(raw_url, cf_zone_id, cf_api_token, domain_map):
                 country_code = parts[2]
                 
                 # Filter based on TARGET_COUNTRIES and check if country is in domain_map
+                # <<< Logic remains the same, relies on TARGET_COUNTRIES list and loaded domain_map >>>
                 if port == "443" and country_code in TARGET_COUNTRIES and country_code in domain_map:
                     if ip_pattern.match(ip):
                          ips_by_country[country_code].append(ip)
@@ -206,11 +205,10 @@ def process_ips_and_update_dns(raw_url, cf_zone_id, cf_api_token, domain_map):
             return
 
         for country_code, available_ips in ips_by_country.items():
+            # <<< Logic remains the same, will process "TW" if found in ips_by_country >>>
             print(f"\n--- 处理国家: {country_code} (找到 {len(available_ips)} 个有效 IP) ---")
 
-            # <<< Use domain_map argument here >>>
             domain_name = domain_map.get(country_code) 
-            # Redundant check as we filtered earlier, but safe
             if not domain_name: 
                 print(f"错误：未能从加载的 domain_map 中找到国家代码 {country_code} 的域名。跳过。")
                 continue
@@ -252,43 +250,51 @@ def process_ips_and_update_dns(raw_url, cf_zone_id, cf_api_token, domain_map):
 # --- 主程序入口 ---
 
 if __name__ == "__main__":
-    # Get config from environment variables
     raw_url = os.environ.get("RAW_URL")
     cf_zone_id = os.environ.get("CF_ZONE_ID")
     cf_api_token = os.environ.get("CF_API_TOKEN")
-    # <<< Get DOMAIN_MAP from environment variable >>>
     domain_map_json_str = os.environ.get("DOMAIN_MAP_JSON")
 
     print("--- DNS 更新脚本 (清理并创建多条记录模式 - DOMAIN_MAP from Secret) 启动 ---")
+    # Include current time based on the system's locale and timezone settings
+    # For potentially more standardized logging in GitHub Actions, consider UTC:
+    # print(f"当前时间 (UTC): {time.strftime('%Y-%m-%d %H:%M:%S %Z', time.gmtime())}") 
     print(f"当前时间: {time.strftime('%Y-%m-%d %H:%M:%S %Z')}")
 
-    # Check required environment variables
+
     missing_vars = []
     if not raw_url: missing_vars.append("RAW_URL")
     if not cf_zone_id: missing_vars.append("CF_ZONE_ID")
     if not cf_api_token: missing_vars.append("CF_API_TOKEN")
-    if not domain_map_json_str: missing_vars.append("DOMAIN_MAP_JSON") # <<< Check new variable
+    if not domain_map_json_str: missing_vars.append("DOMAIN_MAP_JSON")
 
     if missing_vars:
         print(f"错误：以下环境变量未设置: {', '.join(missing_vars)}")
     else:
-        # <<< Parse DOMAIN_MAP_JSON >>>
         try:
             loaded_domain_map = json.loads(domain_map_json_str)
             if not isinstance(loaded_domain_map, dict):
                  raise ValueError("DOMAIN_MAP_JSON 解析结果不是一个字典。")
             print("成功从环境变量加载并解析 DOMAIN_MAP_JSON。")
-            print(f"加载的域名映射: {loaded_domain_map}") # Print loaded map for confirmation
+            print(f"加载的域名映射: {loaded_domain_map}") 
 
-            # Execute main logic, passing the loaded map
-            process_ips_and_update_dns(raw_url, cf_zone_id, cf_api_token, loaded_domain_map)
+            # Ensure TARGET_COUNTRIES only includes keys present in the loaded map
+            # This prevents errors if TARGET_COUNTRIES has something not in the secret
+            effective_target_countries = [c for c in TARGET_COUNTRIES if c in loaded_domain_map]
+            if len(effective_target_countries) != len(TARGET_COUNTRIES):
+                print(f"警告: TARGET_COUNTRIES 中的某些国家在 DOMAIN_MAP_JSON secret 中未定义，将被忽略。")
+            print(f"将处理以下国家 (需在源文件中存在): {effective_target_countries}")
+
+            # Check if any target countries are defined before running
+            if not effective_target_countries:
+                 print("错误: 没有在 DOMAIN_MAP_JSON secret 中定义任何目标国家。无法继续。")
+            else:
+                process_ips_and_update_dns(raw_url, cf_zone_id, cf_api_token, loaded_domain_map)
 
         except json.JSONDecodeError as e:
             print(f"错误：无法将 DOMAIN_MAP_JSON 解析为有效的 JSON: {e}")
-            print(f"请检查 GitHub Secret 'DOMAIN_MAP_JSON' 的值是否为有效的 JSON 字符串，例如：")
-            print('{"PL": "pl.yourdomain.com", "AE": "ae.yourdomain.com", ...}')
+            print(f"请检查 GitHub Secret 'DOMAIN_MAP_JSON' 的值。")
         except ValueError as e:
              print(f"错误: {e}")
-
 
     print("--- DNS 更新脚本结束 ---")
