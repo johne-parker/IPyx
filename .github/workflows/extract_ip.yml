@@ -9,6 +9,8 @@ on:
 jobs:
   extract-ips:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write # Allow the job to write to the repository contents
 
     steps:
       - name: Checkout code
@@ -33,3 +35,4 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           branch: main
           force: false #如果遇到冲突，设置force为true。
+          add: 'ip.txt'
