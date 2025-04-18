@@ -11,6 +11,8 @@ on:
 jobs:
   update-dns:
     runs-on: ubuntu-latest # 使用最新的 Ubuntu runner
+    permissions:
+      contents: write # Allow the job to write to the repository contents
     steps:
       # 第一步：签出你的仓库代码
       - name: Checkout repository code
