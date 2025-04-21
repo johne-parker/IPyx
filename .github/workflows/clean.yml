@@ -4,6 +4,10 @@ on:
   schedule:
     - cron: "0 0 * * 0" # Every Sunday at 00:00
   workflow_dispatch: # 允许手动触发
+
+permissions:
+  actions: write 
+
 jobs:
   clean:
     runs-on: ubuntu-22.04
@@ -11,5 +15,7 @@ jobs:
       - name: Delete old workflow runs
         uses: Mattraks/delete-workflow-runs@v2
         with:
+          token: ${{ secrets.GITHUB_TOKEN }} 
           retain_days: 7
           keep_minimum_runs: 6
+          repository: ${{ github.repository }} 
