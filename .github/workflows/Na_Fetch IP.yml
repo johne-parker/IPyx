@@ -1,0 +1,53 @@
+name: Fetch IP Addresses
+
+on:
+  workflow_dispatch: # 允許手動觸發
+  # schedule: # 或者定時觸發
+  #   - cron: '0 */3 * * *' # 每3小時執行一次
+permissions:
+  actions: write
+jobs:
+  fetch_ips:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4 # 或者適合你倉庫的版本
+
+      - name: Set up Python
+        uses: actions/setup-python@v5 # 或者適合你倉庫的版本
+        with:
+          python-version: '3.11' # 指定 Python 版本
+
+      - name: Install dependencies
+        run: pip install requests
+
+      - name: Run IP fetching script
+        # 將環境變數傳遞給 Python 腳本
+        # Secrets 會自動作為環境變數可用，Variables 需要使用 env 關鍵字明確指定
+        env:
+          REMOTE_JSON_URL: ${{ secrets.REMOTE_JSON_URL || vars.REMOTE_JSON_URL }} # 優先使用 Secret，如果 Secret 不存在則嘗試使用 Variable
+        # 假設你的 Python 腳本叫做 fetch_ips.py
+        run: python fetch_ips.py
+
+      # (可選) 如果你想將生成的 .txt 文件提交回倉庫或作為 Artifacts 保存
+      - name: Commit and push txt files (Optional)
+        run: |
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+          # 檢查是否有 txt 文件被修改或創建
+          if [[ -n $(git status --porcelain *.txt) ]]; then
+            git add *.txt
+            git commit -m "Update IP address files"
+            git push
+          else
+            echo "No changes in txt files to commit."
+          fi
+        # 注意：你可能需要給 workflow 添加寫權限 (permissions: contents: write)
+
+      - name: Upload artifact (Optional)
+        uses: actions/upload-artifact@v4
+        with:
+          name: ip-address-files
+          path: |
+            *.txt
+          if-no-files-found: warn # 如果沒有 txt 文件，則發出警告而不是失敗
