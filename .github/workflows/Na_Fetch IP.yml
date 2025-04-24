@@ -4,11 +4,11 @@ on:
   workflow_dispatch: # 允許手動觸發
   # schedule: # 或者定時觸發
   #   - cron: '0 */3 * * *' # 每3小時執行一次
-permissions:
-  actions: write
 jobs:
   fetch_ips:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - name: Checkout code
         uses: actions/checkout@v4 # 或者適合你倉庫的版本
@@ -29,20 +29,22 @@ jobs:
         # 假設你的 Python 腳本叫做 fetch_ips.py
         run: python fetch_ips.py
 
-      # (可選) 如果你想將生成的 .txt 文件提交回倉庫或作為 Artifacts 保存
-      - name: Commit and push txt files (Optional)
+      - name: Commit and push txt files
         run: |
           git config --global user.name 'github-actions[bot]'
           git config --global user.email 'github-actions[bot]@users.noreply.github.com'
-          # 檢查是否有 txt 文件被修改或創建
-          if [[ -n $(git status --porcelain *.txt) ]]; then
-            git add *.txt
+          # 更健壯的檢查方式：先 add，再檢查是否有 staged 的變更
+          git add *.txt
+          # 使用 git diff --staged --quiet 檢查是否有文件被實際 stage
+          # 如果沒有 staged 的變更，則 ! 返回 true (退出碼 1)，執行 commit 和 push
+          # 如果有 staged 的變更，則 ! 返回 false (退出碼 0)，不執行
+          if ! git diff --staged --quiet; then
+            echo "發現 txt 文件變更，正在提交和推送..."
             git commit -m "Update IP address files"
             git push
           else
-            echo "No changes in txt files to commit."
+            echo "未檢測到 txt 文件變更，無需提交。"
           fi
-        # 注意：你可能需要給 workflow 添加寫權限 (permissions: contents: write)
 
       - name: Upload artifact (Optional)
         uses: actions/upload-artifact@v4
