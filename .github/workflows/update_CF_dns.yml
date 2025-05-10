@@ -4,10 +4,8 @@ name: Update Cloudflare DNS with Fastest IPs
 
 on:
   schedule:
-    # Example: Runs daily at 00:00 UTC. Adjust as needed.
-    # Your '0 16 * * *' was for Shanghai time, which is UTC+8.
-    # So 16:00 Shanghai is 08:00 UTC.
-    - cron: '0 8 * * *' # Changed to UTC for clarity in GitHub
+    # for Shanghai time, which is UTC+8.
+    - cron: '0 0 * * *' 
   workflow_dispatch: # Allows manual triggering
 
 jobs:
