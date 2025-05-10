@@ -1,42 +1,41 @@
 # .github/workflows/update_cloudflare_dns.yml
 
-name: Update Cloudflare DNS Records Regularly # Workflow 的名称
+name: Update Cloudflare DNS with Fastest IPs
 
 on:
   schedule:
-    # 每天0点运行一次 (基于上海 时间)
-    - cron: '0 16 * * *'
-  workflow_dispatch: # 允许手动从 Actions 页面触发此 workflow
+    # Example: Runs daily at 00:00 UTC. Adjust as needed.
+    # Your '0 16 * * *' was for Shanghai time, which is UTC+8.
+    # So 16:00 Shanghai is 08:00 UTC.
+    - cron: '0 8 * * *' # Changed to UTC for clarity in GitHub
+  workflow_dispatch: # Allows manual triggering
 
 jobs:
   update-dns:
-    runs-on: ubuntu-latest # 使用最新的 Ubuntu runner
+    runs-on: ubuntu-latest
     permissions:
-      contents: write # Allow the job to write to the repository contents
+      contents: read # Only needs read if script isn't changing repo files
+                     # If your script writes logs back to repo, then 'write'
     steps:
-      # 第一步：签出你的仓库代码
       - name: Checkout repository code
-        uses: actions/checkout@v4 # 使用 checkout action v4 版本
+        uses: actions/checkout@v4
 
-      # 第二步：设置 Python 环境
       - name: Set up Python environment
-        uses: actions/setup-python@v5 # 使用 setup-python action v5 版本
+        uses: actions/setup-python@v5
         with:
-          python-version: '3.11' # 你可以指定具体版本, 或使用 '3.x'
+          python-version: '3.11' # Or your preferred Python 3 version
 
-      # 第三步：安装 Python 脚本所需的依赖库
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install requests # 安装 requests 库
+          pip install requests # socket is a built-in module
 
-      # 第四步：运行你的 Python DNS 更新脚本
       - name: Run DNS Update Script
         env:
-          # 将 GitHub Secrets 传递给脚本作为环境变量
           RAW_URL: ${{ secrets.RAW_URL }}
           CF_ZONE_ID: ${{ secrets.CF_ZONE_ID }}
           CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
           DOMAIN_MAP_JSON: ${{ secrets.DOMAIN_MAP_JSON }}
-        # 运行你的 Python 脚本，确保文件名正确
+          TARGET_COUNTRIES_JSON: ${{ secrets.TARGET_COUNTRIES_JSON }}
+        # Ensure this matches the filename of your Python script
         run: python pxy2cf.py
