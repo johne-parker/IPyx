@@ -7,28 +7,17 @@ import time
 import re
 import socket
 
-# --- Configuration ---
 CF_API_BASE_URL = "https://api.cloudflare.com/client/v4"
-# TARGET_COUNTRIES: Defines which countries' IPs to process.
-# This will be overridden by the environment variable TARGET_COUNTRIES_JSON if set.
-DEFAULT_TARGET_COUNTRIES = ["PL", "AE", "JP", "KR", "SG", "RU", "DE", "TW", "US"] # Default if not set by env var
+DEFAULT_TARGET_COUNTRIES = ["PL", "AE", "JP", "KR", "SG", "RU", "DE", "TW", "US"] 
 
-# Number of IPs to randomly select for TCPing per country
 NUM_IPS_TO_TEST = 20
-# Number of fastest IPs to select for DNS records per country
 NUM_FASTEST_IPS_FOR_DNS = 3
-# Port to test (must be a string for comparison with fetched data initially)
 TARGET_PORT = "443"
-# TCP connection timeout in seconds
-TCP_TIMEOUT = 1 # Reduced for faster testing of many IPs
-# IPv4 Regex for validation
+TCP_TIMEOUT = 1 
 IPV4_REGEX = r"^((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])$"
-# Cloudflare Proxied status
 PROXY_STATUS = False
-# DNS Record TTL
-RECORD_TTL = 60 # Time To Live in seconds for DNS records
+RECORD_TTL = 60 
 
-# --- TCP Ping Function ---
 def tcp_ping(host, port, timeout=TCP_TIMEOUT):
     """
     Performs a TCP connection test to the given host and port.
@@ -53,7 +42,6 @@ def tcp_ping(host, port, timeout=TCP_TIMEOUT):
         # print(f"    - TCP Ping to {host}:{port} failed: {e}") # Optional: for debugging
         return None
 
-# --- Cloudflare API Functions (largely from your provided script) ---
 def cf_api_request(method, endpoint, zone_id, api_token, params=None, data=None):
     """Unified Cloudflare API request handler."""
     headers = {
@@ -75,7 +63,6 @@ def cf_api_request(method, endpoint, zone_id, api_token, params=None, data=None)
                 return None
             return response_data
         except json.JSONDecodeError:
-            # Handle cases where API returns success with non-JSON body (e.g., some DELETE operations)
             if response.status_code == 200 and method.upper() in ['DELETE', 'PUT'] or \
                (method.upper() == 'GET' and response.text.strip() == '' and response_data.get("result") is None): # some GETs might return empty success
                 print(f"INFO: {method} request successful with status {response.status_code}, but no standard JSON success body or empty result.")
@@ -102,7 +89,6 @@ def cf_api_request(method, endpoint, zone_id, api_token, params=None, data=None)
 def verify_cf_credentials(zone_id, api_token):
     """Verifies Cloudflare API Token and Zone ID."""
     print("Verifying Cloudflare credentials...")
-    # Endpoint for getting zone details
     response_data = cf_api_request("GET", "", zone_id, api_token) # Empty endpoint means /zones/{zone_id}
     if response_data and response_data.get("success"):
         zone_info = response_data.get("result")
@@ -191,7 +177,6 @@ def create_cf_dns_record(zone_id, api_token, domain_name, ip_address):
         print(f"    - Failed to create record: {domain_name} -> {ip_address}")
         return False
 
-# --- Main Logic ---
 def process_ips_and_update_dns(raw_url, cf_zone_id, cf_api_token, target_countries, domain_map):
     """
     Fetches, TCPings, filters IPs, and updates Cloudflare DNS records.
@@ -245,14 +230,10 @@ def process_ips_and_update_dns(raw_url, cf_zone_id, cf_api_token, target_countri
         country_specific_ips = all_ips_by_country.get(country_code, [])
         if not country_specific_ips:
             print(f"  No IPs on port {TARGET_PORT} found for country {country_code} from the source. Skipping DNS update for {domain_name}.")
-            # Optionally, clear existing records if no new IPs are found
-            # print(f"  Attempting to clear existing records for {domain_name} as no new IPs are available.")
-            # clear_cf_domain_a_records(cf_zone_id, cf_api_token, domain_name)
             continue
 
         print(f"  Found {len(country_specific_ips)} IPs for {country_code} on port {TARGET_PORT}.")
 
-        # 1. Randomly select IPs for testing
         num_to_actually_test = min(NUM_IPS_TO_TEST, len(country_specific_ips))
         if num_to_actually_test == 0:
             print(f"  No IPs to test for {country_code}. Skipping.")
@@ -261,7 +242,6 @@ def process_ips_and_update_dns(raw_url, cf_zone_id, cf_api_token, target_countri
         ips_to_test = random.sample(country_specific_ips, num_to_actually_test)
         print(f"  Randomly selected {len(ips_to_test)} IPs for TCPing: {ips_to_test[:5]}... (showing max 5)") # Show a few
 
-        # 2. Perform TCPing and filter
         responsive_ips_with_latency = []
         print(f"  Performing TCPing on {len(ips_to_test)} IPs for {country_code} (port {TARGET_PORT}, timeout {TCP_TIMEOUT}s)...")
         test_count = 0
@@ -278,20 +258,14 @@ def process_ips_and_update_dns(raw_url, cf_zone_id, cf_api_token, target_countri
 
         if not responsive_ips_with_latency:
             print(f"  No responsive IPs found for {country_code} after TCPing. Skipping DNS update for {domain_name}.")
-            # Optionally, clear existing records if no responsive IPs are found
-            # print(f"  Attempting to clear existing records for {domain_name} as no responsive IPs are available.")
-            # clear_cf_domain_a_records(cf_zone_id, cf_api_token, domain_name)
             continue
 
-        # 3. Select the N fastest IPs
         responsive_ips_with_latency.sort(key=lambda x: x["latency"])
         fastest_ips = [item["ip"] for item in responsive_ips_with_latency[:NUM_FASTEST_IPS_FOR_DNS]]
         print(f"  Selected {len(fastest_ips)} fastest IPs for DNS ({domain_name}):")
         for item in responsive_ips_with_latency[:NUM_FASTEST_IPS_FOR_DNS]:
             print(f"    - {item['ip']} (Latency: {item['latency']:.2f} ms)")
 
-
-        # 4. Update Cloudflare DNS
         print(f"  Updating Cloudflare DNS for {domain_name} with {len(fastest_ips)} IPs...")
         if not clear_cf_domain_a_records(cf_zone_id, cf_api_token, domain_name):
             print(f"  WARNING: Issues clearing old DNS records for {domain_name}. Proceeding with creating new ones.")
@@ -317,9 +291,7 @@ if __name__ == "__main__":
     raw_url = os.environ.get("RAW_URL")
     cf_zone_id = os.environ.get("CF_ZONE_ID")
     cf_api_token = os.environ.get("CF_API_TOKEN")
-    # DOMAIN_MAP_JSON: e.g., {"AE": "ae.dyme.dpdns.org", "US": "us.dyme.dpdns.org"}
     domain_map_json_str = os.environ.get("DOMAIN_MAP_JSON")
-    # TARGET_COUNTRIES_JSON: e.g., ["AE", "US", "DE"]
     target_countries_json_str = os.environ.get("TARGET_COUNTRIES_JSON")
 
 
@@ -328,7 +300,6 @@ if __name__ == "__main__":
     if not cf_zone_id: missing_vars.append("CF_ZONE_ID")
     if not cf_api_token: missing_vars.append("CF_API_TOKEN")
     if not domain_map_json_str: missing_vars.append("DOMAIN_MAP_JSON")
-    # target_countries_json_str is optional, will use DEFAULT_TARGET_COUNTRIES if not set
 
     if missing_vars:
         print(f"ERROR: Critical environment variables not set: {', '.join(missing_vars)}")
@@ -346,8 +317,6 @@ if __name__ == "__main__":
                     raise ValueError("TARGET_COUNTRIES_JSON must be a JSON array (list) of strings.")
             print(f"Target countries to process: {target_countries}")
             
-            # Filter domain_map to only include entries for target_countries to avoid processing others.
-            # Also, ensure all target_countries have a mapping.
             effective_domain_map = {}
             valid_target_countries = []
             for country in target_countries:
