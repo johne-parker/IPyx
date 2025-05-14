@@ -7,7 +7,7 @@ import time
 import re
 import socket
 
-# --- Configuration ---
+# --- Configuration ---dyme---
 CF_API_BASE_URL = "https://api.cloudflare.com/client/v4"
 DEFAULT_TARGET_COUNTRIES = ["PL", "AE", "JP", "KR", "SG", "RU", "DE", "TW", "US"]
 
