@@ -1,6 +1,6 @@
 import requests
 import os
-import random # 确保已导入 random 模块
+import random
 import json
 from collections import defaultdict
 import time
@@ -13,7 +13,7 @@ CF_API_BASE_URL = "https://api.cloudflare.com/client/v4"
 DEFAULT_TARGET_COUNTRIES = ["PL", "AE", "JP", "KR", "SG", "RU", "DE", "TW", "US"]
 
 NUM_IPS_TO_TEST = 20
-NUM_FASTEST_IPS_FOR_DNS = 3 # 我们需要欺诈值最低且都小于40的3个IP
+NUM_FASTEST_IPS_FOR_DNS = 3 # 最低且都小于40的3个IP
 TARGET_PORT = "443"
 TCP_TIMEOUT = 1
 IPV4_REGEX = r"^((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])$"
@@ -44,7 +44,7 @@ def tcp_ping(host, port, timeout=TCP_TIMEOUT):
 # --- Scamalytics Fraud Score Function ---
 def get_scamalytics_fraud_score(ip_address):
     """
-    访问 Scamalytics 网站获取给定 IP 地址的欺诈分数。
+    访问 Scamalytics 网站获取给定 IP 地址的纯净分数。
     """
     url = f"https://scamalytics.com/ip/{ip_address}"
     # 使用更具体的 User-Agent 和其他请求头
@@ -79,16 +79,16 @@ def get_scamalytics_fraud_score(ip_address):
                 score = int(score_text.replace("Fraud Score:", "").strip())
                 return score
             except ValueError:
-                print(f"WARNING: 无法解析 IP {ip_address} 的欺诈分数文本: '{score_text}'")
+                print(f"WARNING: 无法解析 IP {ip_address} 的纯净分数文本: '{score_text}'")
                 return None
         else:
-            print(f"WARNING: 未能在 IP {ip_address} 的页面中找到欺诈分数元素。")
+            print(f"WARNING: 未能在 IP {ip_address} 的页面中找到纯净分数元素。")
             return None
     except requests.exceptions.RequestException as e:
         print(f"ERROR: 请求 IP {ip_address} 时发生网络错误: {e}")
         return None
     except Exception as e:
-        print(f"ERROR: 处理 IP {ip_address} 欺诈分数时发生未知错误: {e}")
+        print(f"ERROR: 处理 IP {ip_address} 纯净分数时发生未知错误: {e}")
         return None
 
 # --- Cloudflare API Functions (unchanged) ---
@@ -278,7 +278,7 @@ def process_ips_and_update_dns(raw_url, cf_zone_id, cf_api_token, target_countri
             overall_failure_count += 1
             continue
 
-        # 步骤2: 欺诈分数检查
+        # 步骤2: 纯净分数检查
         ips_with_fraud_score = []
         print(f"  - [{domain_placeholder_for_log}] Checking fraud scores for {len(responsive_ips_with_latency)} responsive IPs...")
         for ip_info in responsive_ips_with_latency:
@@ -286,40 +286,35 @@ def process_ips_and_update_dns(raw_url, cf_zone_id, cf_api_token, target_countri
             fraud_score = get_scamalytics_fraud_score(ip_addr)
             
             if fraud_score is not None:
-                print(f"    - IP: {ip_addr}, 欺诈分数: {fraud_score}")
-                if fraud_score < 40: # 只保留欺诈分数小于 40 的IP
+                print(f"    - IP: {ip_addr}, 纯净分数: {fraud_score}")
+                if fraud_score < 40: # 只保留纯净分数小于 40 的IP
                     ips_with_fraud_score.append({
                         "ip": ip_addr,
                         "latency": ip_info["latency"],
                         "fraud_score": fraud_score
                     })
             else:
-                print(f"    - IP: {ip_addr}, 欺诈分数: 无法获取 (跳过)")
+                print(f"    - IP: {ip_addr}, 纯净分数: 无法获取 (跳过)")
             
-            # Scamalytics 网站查询之间的延迟，使用 5 到 12 秒的随机整数
-            time.sleep(random.randint(8, 15)) 
+            # Scamalytics 网站查询之间的延迟
+            time.sleep(random.randint(8, 16)) 
 
-        if not ips_with_fraud_score:
-            print(f"  - [{domain_placeholder_for_log}] 警告: 没有找到欺诈分数低于 40 的IP。")
+        if not ips_with_fraud_score: # 修改后的条件：如果列表为空（0个满足条件的IP），则不更新
+            print(f"  - [{domain_placeholder_for_log}] 警告: 没有找到任何纯净分数低于 40 的IP。将不更新DNS记录。")
             overall_failure_count += 1
             continue
 
         # 步骤3: 排序并选择最佳IP
-        # 优先按欺诈分数升序，然后按延迟升序排序
+        # 优先按纯净分数升序，然后按延迟升序排序
         ips_with_fraud_score.sort(key=lambda x: (x["fraud_score"], x["latency"]))
         
-        # 选择前 NUM_FASTEST_IPS_FOR_DNS (3) 个IP
+        # 选择前 NUM_FASTEST_IPS_FOR_DNS (3) 个IP，如果不足3个，则选择所有找到的
         final_ips_for_dns = [item["ip"] for item in ips_with_fraud_score[:NUM_FASTEST_IPS_FOR_DNS]]
         
-        # 步骤4: 检查数量是否满足要求
-        if len(final_ips_for_dns) < NUM_FASTEST_IPS_FOR_DNS:
-            print(f"  - [{domain_placeholder_for_log}] 警告: 找到的欺诈分数低于40的IP数量不足 {NUM_FASTEST_IPS_FOR_DNS} 个 ({len(final_ips_for_dns)}个)。将不更新DNS记录。")
-            overall_failure_count += 1
-            continue # 跳过当前国家的DNS更新
-
+        # 不再有数量不足 NUM_FASTEST_IPS_FOR_DNS 但大于0的警告，因为只要有就更新
         print(f"  - [{domain_placeholder_for_log}] 选定用于DNS更新的IP ({len(final_ips_for_dns)} 个): {final_ips_for_dns}")
 
-        # 步骤5: 清理并创建DNS记录
+        # 步骤4: 清理并创建DNS记录
         if not clear_cf_domain_a_records(cf_zone_id, cf_api_token, actual_domain_name, country_code_iter):
             print(f"WARNING: Issues clearing old DNS records for {domain_placeholder_for_log}. Proceeding anyway to attempt creation.")
 
@@ -335,7 +330,7 @@ def process_ips_and_update_dns(raw_url, cf_zone_id, cf_api_token, target_countri
         elif len(final_ips_for_dns) > 0 : # 部分成功或完全失败但尝试过
             print(f"PARTIAL/FAIL: {domain_placeholder_for_log}: {creation_success_for_country}/{len(final_ips_for_dns)} IPs updated.")
             overall_failure_count +=1
-        else: # 没有最终IP可供更新 (此情况通常会被前面的 `if len(final_ips_for_dns) < NUM_FASTEST_IPS_FOR_DNS` 捕获)
+        else: # 没有最终IP可供更新 (此情况现在只会发生在 ips_with_fraud_score 为空时)
             print(f"INFO: No IPs to update for {domain_placeholder_for_log} (this state should be rare due to prior checks).")
 
 
