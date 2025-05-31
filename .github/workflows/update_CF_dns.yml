@@ -26,8 +26,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install requests # socket is a built-in module
-          pip install beautifulsoup4
+          pip install requests beautifulsoup4
 
       - name: Run DNS Update Script
         env:
