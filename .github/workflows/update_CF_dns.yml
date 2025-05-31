@@ -27,6 +27,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install requests # socket is a built-in module
+          pip install beautifulsoup4
 
       - name: Run DNS Update Script
         env:
